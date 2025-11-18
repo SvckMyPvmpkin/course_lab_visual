@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "bookdialog.h"
+#include "bookdetailsdialog.h"
 #include <QVBoxLayout>
 #include <QHBoxLayout>
 #include <QGroupBox>
@@ -9,6 +10,10 @@
 #include <QMenuBar>
 #include <QAction>
 #include <QStatusBar>
+#include <QListWidget>
+#include <QPixmap>
+#include <QPainter>
+#include <QFileInfo>
 
 MainWindow::MainWindow(QWidget* parent)
     : QMainWindow(parent), m_library(new LibraryManager(this)) {
@@ -19,7 +24,7 @@ MainWindow::MainWindow(QWidget* parent)
             this, &MainWindow::onLibraryChanged);
     
     setWindowTitle("Персональная библиотека книг");
-    resize(1000, 700);
+    resize(1100, 750);
     
     onLibraryChanged();
 }
@@ -127,20 +132,20 @@ void MainWindow::createMainTab() {
     buttonsLayout->addStretch();
     buttonsLayout->addWidget(m_refreshButton);
     
-    // Table
-    m_booksTable = new QTableWidget();
-    m_booksTable->setColumnCount(8);
-    m_booksTable->setHorizontalHeaderLabels(
-        {"ID", "Название", "Автор", "Жанр", "Год", "Статус", "Теги", "Оценка"});
-    m_booksTable->horizontalHeader()->setStretchLastSection(true);
-    m_booksTable->setSelectionBehavior(QAbstractItemView::SelectRows);
-    m_booksTable->setEditTriggers(QAbstractItemView::NoEditTriggers);
-    m_booksTable->setAlternatingRowColors(true);
+    // Cards list (icon view)
+    m_booksList = new QListWidget();
+    m_booksList->setViewMode(QListView::IconMode);
+    m_booksList->setIconSize(QSize(128, 180));
+    m_booksList->setGridSize(QSize(160, 220));
+    m_booksList->setResizeMode(QListView::Adjust);
+    m_booksList->setMovement(QListView::Static);
+    m_booksList->setSpacing(12);
+    m_booksList->setSelectionMode(QAbstractItemView::SingleSelection);
     
     layout->addWidget(searchGroup);
     layout->addWidget(sortGroup);
     layout->addLayout(buttonsLayout);
-    layout->addWidget(m_booksTable);
+    layout->addWidget(m_booksList);
     
     m_tabWidget->addTab(mainTab, "Все книги");
     
@@ -152,8 +157,8 @@ void MainWindow::createMainTab() {
     connect(m_searchButton, &QPushButton::clicked, this, &MainWindow::onSearch);
     connect(m_clearSearchButton, &QPushButton::clicked, this, &MainWindow::onClearSearch);
     connect(m_sortButton, &QPushButton::clicked, this, &MainWindow::onSort);
-    connect(m_booksTable, &QTableWidget::cellDoubleClicked, 
-            this, &MainWindow::onTableDoubleClick);
+    // itemActivated срабатывает и на двойной клик мышью, и на Enter — достаточно одного сигнала
+    connect(m_booksList, &QListWidget::itemActivated, this, &MainWindow::onCardActivated);
 }
 
 void MainWindow::createListsTabs() {
@@ -255,37 +260,34 @@ void MainWindow::onAddBook() {
 }
 
 void MainWindow::onEditBook() {
-    int currentRow = m_booksTable->currentRow();
-    if (currentRow < 0) {
+    QList<QListWidgetItem*> selection = m_booksList->selectedItems();
+    if (selection.isEmpty()) {
         QMessageBox::warning(this, "Предупреждение", 
                            "Выберите книгу для редактирования");
         return;
     }
-    
-    int bookId = m_booksTable->item(currentRow, 0)->text().toInt();
+    int bookId = selection.first()->data(Qt::UserRole).toInt();
     Book* book = m_library->findBookById(bookId);
-    
     if (book) {
-        BookDialog dialog(this, *book);
-        if (dialog.exec() == QDialog::Accepted) {
-            Book updatedBook = dialog.getBook();
-            updatedBook.setId(bookId);
-            m_library->updateBook(updatedBook);
-            statusBar()->showMessage("Книга обновлена", 3000);
+        BookDetailsDialog dlg(this, *book);
+        if (dlg.exec() == QDialog::Accepted) {
+            Book updated = dlg.getUpdatedBook();
+            updated.setId(bookId);
+            m_library->updateBook(updated);
+            statusBar()->showMessage("Изменения сохранены", 3000);
         }
     }
 }
 
 void MainWindow::onDeleteBook() {
-    int currentRow = m_booksTable->currentRow();
-    if (currentRow < 0) {
+    QList<QListWidgetItem*> selection = m_booksList->selectedItems();
+    if (selection.isEmpty()) {
         QMessageBox::warning(this, "Предупреждение", 
                            "Выберите книгу для удаления");
         return;
     }
-    
-    int bookId = m_booksTable->item(currentRow, 0)->text().toInt();
-    QString title = m_booksTable->item(currentRow, 1)->text();
+    int bookId = selection.first()->data(Qt::UserRole).toInt();
+    QString title = selection.first()->text();
     
     QMessageBox::StandardButton reply = QMessageBox::question(
         this, "Подтверждение", 
@@ -385,15 +387,33 @@ void MainWindow::onLibraryChanged() {
     updateStatistics();
 }
 
-void MainWindow::onTableDoubleClick(int row, int column) {
-    Q_UNUSED(column);
-    if (row >= 0) {
-        onEditBook();
+void MainWindow::onCardActivated(QListWidgetItem* item) {
+    if (!item) return;
+    int bookId = item->data(Qt::UserRole).toInt();
+    Book* book = m_library->findBookById(bookId);
+    if (!book) return;
+    BookDetailsDialog dlg(this, *book);
+    if (dlg.exec() == QDialog::Accepted) {
+        Book updated = dlg.getUpdatedBook();
+        updated.setId(bookId);
+        m_library->updateBook(updated);
     }
 }
 
 void MainWindow::updateBooksTable(const QList<Book>& books) {
-    fillTableWithBooks(m_booksTable, books);
+    // rebuild cards list
+    m_booksList->clear();
+    for (const Book& b : books) {
+        QListWidgetItem* it = new QListWidgetItem(makeCoverIcon(b), b.getTitle());
+        it->setData(Qt::UserRole, b.getId());
+        it->setToolTip(QString("%1\n%2 (%3, %4)\n%5")
+                       .arg(b.getTitle())
+                       .arg(b.getAuthor())
+                       .arg(b.getGenre())
+                       .arg(b.getYear())
+                       .arg(b.getTags().join(", ")));
+        m_booksList->addItem(it);
+    }
 }
 
 void MainWindow::updateStatistics() {
@@ -413,11 +433,9 @@ void MainWindow::updateAllLists() {
 
 void MainWindow::fillTableWithBooks(QTableWidget* table, const QList<Book>& books) {
     table->setRowCount(0);
-    
     for (const Book& book : books) {
         int row = table->rowCount();
         table->insertRow(row);
-        
         table->setItem(row, 0, new QTableWidgetItem(QString::number(book.getId())));
         table->setItem(row, 1, new QTableWidgetItem(book.getTitle()));
         table->setItem(row, 2, new QTableWidgetItem(book.getAuthor()));
@@ -427,4 +445,30 @@ void MainWindow::fillTableWithBooks(QTableWidget* table, const QList<Book>& book
         table->setItem(row, 6, new QTableWidgetItem(book.getTags().join(", ")));
         table->setItem(row, 7, new QTableWidgetItem(book.getRating() > 0 ? QString::number(book.getRating()) : "-"));
     }
+}
+
+QIcon MainWindow::makeCoverIcon(const Book& book) const {
+    const int w = 128, h = 180;
+    QPixmap canvas(w, h);
+    QString path = book.getCoverPath();
+    if (!path.isEmpty()) {
+        QPixmap src(path);
+        if (!src.isNull()) {
+            QPixmap scaled = src.scaled(w, h, Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
+            canvas.fill(Qt::transparent);
+            QPainter p(&canvas);
+            const int x = (w - scaled.width()) / 2;
+            const int y = (h - scaled.height()) / 2;
+            p.drawPixmap(x, y, scaled);
+            p.end();
+            return QIcon(canvas);
+        }
+    }
+    canvas.fill(QColor(230,230,230));
+    QPainter p(&canvas);
+    p.setPen(Qt::darkGray);
+    p.drawRect(0,0,w-1,h-1);
+    p.drawText(canvas.rect(), Qt::AlignCenter|Qt::TextWordWrap, "Нет обложки");
+    p.end();
+    return QIcon(canvas);
 }

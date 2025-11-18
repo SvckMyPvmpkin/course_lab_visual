@@ -3,11 +3,13 @@
 
 #include <QMainWindow>
 #include <QTableWidget>
+#include <QListWidget>
 #include <QLineEdit>
 #include <QPushButton>
 #include <QComboBox>
 #include <QLabel>
 #include <QTabWidget>
+#include <QIcon>
 #include "librarymanager.h"
 
 class MainWindow : public QMainWindow {
@@ -20,7 +22,7 @@ private:
     QTabWidget* m_tabWidget;
     
     // All books tab
-    QTableWidget* m_booksTable;
+    QListWidget* m_booksList; // карточки книг
     QPushButton* m_addButton;
     QPushButton* m_editButton;
     QPushButton* m_deleteButton;
@@ -64,7 +66,7 @@ private slots:
     void onExport();
     void onImport();
     void onLibraryChanged();
-    void onTableDoubleClick(int row, int column);
+    void onCardActivated(QListWidgetItem* item);
 
 private:
     void setupUI();
@@ -72,10 +74,11 @@ private:
     void createMainTab();
     void createListsTabs();
     void createStatisticsPanel();
-    void updateBooksTable(const QList<Book>& books);
+    void updateBooksTable(const QList<Book>& books); // теперь обновляет карточки
     void updateStatistics();
     void updateAllLists();
     void fillTableWithBooks(QTableWidget* table, const QList<Book>& books);
+    QIcon makeCoverIcon(const Book& book) const;
 };
 
 #endif // MAINWINDOW_H

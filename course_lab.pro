@@ -32,6 +32,7 @@ SOURCES += \
         book.cpp \
         bookcollection.cpp \
         bookdialog.cpp \
+        bookdetailsdialog.cpp \
         librarymanager.cpp \
         sortstrategy.cpp
 
@@ -41,6 +42,7 @@ HEADERS += \
         book.h \
         bookcollection.h \
         bookdialog.h \
+        bookdetailsdialog.h \
         librarymanager.h \
         sortstrategy.h
 

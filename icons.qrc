@@ -1,0 +1,12 @@
+<RCC>
+  <qresource prefix="/icons">
+    <file alias="add">icons/add a book.png</file>
+    <file alias="delete">icons/delete a book.png</file>
+    <file alias="edit">icons/edit a book.png</file>
+    <file alias="library">icons/library page.png</file>
+    <file alias="stat">icons/stat page.png</file>
+    <file alias="refresh">icons/refresh library.png</file>
+    <file alias="search">icons/search in library.png</file>
+    <file alias="sort">icons/sortby arrow.png</file>
+  </qresource>
+</RCC>

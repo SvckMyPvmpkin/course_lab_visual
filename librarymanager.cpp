@@ -3,6 +3,7 @@
 #include <QJsonDocument>
 #include <QJsonArray>
 #include <QJsonObject>
+#include <algorithm>
 
 LibraryManager::LibraryManager(QObject* parent)
     : QObject(parent), 
@@ -145,6 +146,27 @@ int LibraryManager::getReadBookCount() const {
 
 int LibraryManager::getPlanToReadCount() const {
     return m_planToRead->getCount();
+}
+
+QList<Book> LibraryManager::getTopRatedBooks(int count) const {
+    QList<Book> allBooks = m_allBooks->getBooks();
+    // Фильтруем только книги с оценкой > 0
+    QList<Book> ratedBooks;
+    for (const Book& book : allBooks) {
+        if (book.getRating() > 0) {
+            ratedBooks.append(book);
+        }
+    }
+    // Сортируем по убыванию оценки
+    std::sort(ratedBooks.begin(), ratedBooks.end(), 
+        [](const Book& a, const Book& b) {
+            return a.getRating() > b.getRating();
+        });
+    // Возвращаем топ N
+    if (ratedBooks.size() > count) {
+        ratedBooks = ratedBooks.mid(0, count);
+    }
+    return ratedBooks;
 }
 
 bool LibraryManager::exportToJson(const QString& filename) const {

@@ -54,6 +54,7 @@ public:
     int getTotalBookCount() const;
     int getReadBookCount() const;
     int getPlanToReadCount() const;
+    QList<Book> getTopRatedBooks(int count = 5) const;
     
     // Import/Export
     bool exportToJson(const QString& filename) const;

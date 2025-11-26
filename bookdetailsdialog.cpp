@@ -10,6 +10,7 @@
 
 BookDetailsDialog::BookDetailsDialog(QWidget* parent, const Book& book)
     : QDialog(parent), m_book(book) {
+    this->setStyleSheet("QDialog{background:#3d3d3d;}");
     setupUI();
     loadBook(book);
     setWindowTitle("Информация о книге");
@@ -25,7 +26,13 @@ void BookDetailsDialog::setupUI() {
     m_coverLabel->setFixedSize(160, 220);
     m_coverLabel->setFrameShape(QFrame::StyledPanel);
 
-    QFormLayout* info = new QFormLayout();
+    // Панель для информации справа от обложки
+    QFrame* infoPanel = new QFrame();
+    infoPanel->setObjectName("Panel");
+    QFormLayout* info = new QFormLayout(infoPanel);
+    info->setContentsMargins(16, 16, 16, 16);
+    info->setSpacing(8);
+    
     m_titleLabel = new QLabel();
     m_titleLabel->setWordWrap(true);
     m_authorLabel = new QLabel();
@@ -41,12 +48,14 @@ void BookDetailsDialog::setupUI() {
     info->addRow("Теги:", m_tagsLabel);
 
     top->addWidget(m_coverLabel);
-    top->addLayout(info);
+    top->addWidget(infoPanel, 1);
     main->addLayout(top);
 
     // Редактируемые поля
     QGroupBox* editable = new QGroupBox("Оценка, статус, рецензия");
-    QFormLayout* form = new QFormLayout();
+    QFormLayout* form = new QFormLayout(editable);
+    form->setContentsMargins(16, 32, 16, 16);
+    form->setSpacing(8);
 
     m_ratingSpin = new QSpinBox();
     m_ratingSpin->setRange(0, 10); // 0 — нет оценки
@@ -64,7 +73,6 @@ void BookDetailsDialog::setupUI() {
     form->addRow("Статус:", m_statusCombo);
     form->addRow("Рецензия:", m_reviewEdit);
 
-    editable->setLayout(form);
     main->addWidget(editable);
 
     QDialogButtonBox* box = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -92,8 +100,9 @@ void BookDetailsDialog::loadBook(const Book& book) {
     if (!book.getCoverPath().isEmpty()) {
         QPixmap src(book.getCoverPath());
         if (!src.isNull()) {
+            // Заполняем фон белым перед рисованием обложки
+            pix.fill(QColor(255, 255, 255));
             QPixmap scaled = src.scaled(pix.size(), Qt::KeepAspectRatioByExpanding, Qt::SmoothTransformation);
-            pix.fill(Qt::transparent);
             QPainter p(&pix);
             const int x = (pix.width() - scaled.width()) / 2;
             const int y = (pix.height() - scaled.height()) / 2;

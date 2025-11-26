@@ -7,6 +7,7 @@
 #include <QDialogButtonBox>
 #include <QMessageBox>
 #include <QFileDialog>
+#include <QFrame>
 
 BookDialog::BookDialog(QWidget* parent, const Book& book)
     : QDialog(parent), m_book(book), m_isEditMode(book.getId() != 0) {
@@ -24,8 +25,15 @@ BookDialog::BookDialog(QWidget* parent, const Book& book)
 }
 
 void BookDialog::setupUI() {
+    // Dialog dark theme + panel reuse from app stylesheet
+    this->setStyleSheet("QDialog{background:#3d3d3d;}");
+
     QVBoxLayout* mainLayout = new QVBoxLayout(this);
-    
+
+    QFrame* panel = new QFrame();
+    panel->setObjectName("Panel");
+    QVBoxLayout* panelLayout = new QVBoxLayout(panel);
+
     QFormLayout* formLayout = new QFormLayout();
     
     m_titleEdit = new QLineEdit();
@@ -74,13 +82,23 @@ void BookDialog::setupUI() {
     m_reviewEdit->setPlaceholderText("Короткая рецензия...");
     formLayout->addRow("Рецензия:", m_reviewEdit);
 
-    mainLayout->addLayout(formLayout);
+    // Блокировка оценки и рецензии для статусов "Читаю" и "Планирую прочитать"
+    connect(m_statusCombo,
+            QOverload<int>::of(&QComboBox::currentIndexChanged),
+            this,
+            [this](int) {
+                const int idx = m_statusCombo->currentIndex();
+                const bool disable = (idx == 1 || idx == 3);
+                m_ratingSpin->setEnabled(!disable);
+                m_reviewEdit->setEnabled(!disable);
+                if (disable) {
+                    m_ratingSpin->setValue(0);
+                    m_reviewEdit->clear();
+                }
+            });
 
-    QLabel* noteLabel = new QLabel("* - обязательные поля");
-    noteLabel->setStyleSheet("color: gray; font-size: 9pt;");
-    mainLayout->addWidget(noteLabel);
-
-    mainLayout->addStretch();
+    panelLayout->addLayout(formLayout);
+    mainLayout->addWidget(panel);
 
     QDialogButtonBox* buttonBox = new QDialogButtonBox(
         QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
@@ -123,10 +141,17 @@ void BookDialog::loadBook(const Book& book) {
     m_ratingSpin->setValue(book.getRating());
     m_coverPathEdit->setText(book.getCoverPath());
     m_reviewEdit->setPlainText(book.getReview());
+
+    // Применяем те же правила блокировки полей в режиме редактирования
+    const int idx = m_statusCombo->currentIndex();
+    const bool disable = (idx == 1 || idx == 3);
+    m_ratingSpin->setEnabled(!disable);
+    m_reviewEdit->setEnabled(!disable);
 }
 
 Book BookDialog::getBook() const {
-    Book book;
+    // В режиме редактирования сохраняем id (и при необходимости другие поля) исходной книги
+    Book book = m_book;
     book.setTitle(m_titleEdit->text().trimmed());
     book.setAuthor(m_authorEdit->text().trimmed());
     book.setGenre(m_genreEdit->text().trimmed());
